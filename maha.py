@@ -4,9 +4,22 @@ import pandas as pd
 from datetime import datetime
 import os
 
-keywords = ["Pune", "pune", "PMC/BHAVAN", "PCMC", "Yerawada", "yerawada", "Pune Camp", "pune camp", "Kothrud", "kothrud", "Bavdhan", "bavdhan", "baner", "Baner", "Aundh", "aundh", "Warje", "warje", "Karvenagar", "karvenagar", "Ganeshkind", "ganeshkind", "Balewadi", "balewadi", "Pashan", "pashan", "Kharadi", "kharadi", "Vadgaon Sheri", "vadgaon sheri", "Vidyanagar", "vidyanagar", "Vishrantwadi", "vishrantwadi", "Hadapsar", "hadapsar", "Magarpatta", "magarpatta", "Sinhagad Road", "sinhagad road", "Mundhwa", "mundhwa", "Anandnagar", "anandnagar", "Khadakwasla", "khadakwasla", "Dhayari", "dhayari", "Bibwewadi", "bibwewadi", "Vadgaon Budruk", "vadgaon budruk", "Market Yard", "market yard", "salisbury park", "Salisbury Park", "Dhankawadi", "dhankawadi", "Katraj", "katraj", "kondhwa", "Kondhwa", "Ambegaon", "ambegaon", "NIBM", "Hinjewadi", "hinjewadi", "Marunji", "marunji", "Chinchwad", "chinchwad", "Akurdi", "akurdi", "Chichwadgaon", "chichwadgaon", "Thergaon", "thergaon", "Punawale", "punawale", "Sangvi", "sangvi", "Pimple Nilakh", "pimple nilakh", "Bhosari", "bhosari", "Talwade", "talwade", "Shivajinagar", "shivajinagar", "Laxmi Road", "laxmi road", "Kasba Peth", "kasba peth", "Rasta Peth", "rasta peth", "Mangalwar Peth", "mangalwar peth", "Sadashiv Peth", "sadashiv peth", "Shaniwar Peth", "shaniwar peth", "Narayan Peth", "narayan peth"]
+keywords = ["Pune", "pune", "PMC/BHAVAN", "PCMC", "Yerawada", "yerawada", "Pune Camp", "pune camp", "Kothrud", "kothrud", "Bavdhan", "bavdhan", "baner", "Baner", "Aundh", "aundh", "Warje", "warje", "Karvenagar", "karvenagar", "Ganeshkind", "ganeshkind", "Balewadi", "balewadi", "Pashan", "pashan", "Kharadi", "kharadi", "Vadgaon Sheri", "vadgaon sheri", "Vidyanagar", "vidyanagar", "Vishrantwadi", "vishrantwadi", "Hadapsar", "hadapsar", "Magarpatta", "magarpatta", "Sinhagad Road", "sinhagad road", "Mundhwa", "mundhwa", "Anandnagar", "anandnagar", "Khadakwasla", "khadakwasla", "Dhayari", "dhayari", "Bibwewadi", "bibwewadi", "Vadgaon Budruk", "vadgaon budruk", "Market Yard", "market yard", "salisbury park", "Salisbury Park", "Dhankawadi", "dhankawadi", "Katraj", "katraj", "kondhwa", "Kondhwa", "Ambegaon", "ambegaon", "NIBM", "Hinjewadi", "hinjewadi", "Marunji", "marunji", "Chinchwad", "chinchwad", "Akurdi", "akurdi", "Chinchwadgaon", "chinchwadgaon", "Thergaon", "thergaon", "Punawale", "punawale", "Sangvi", "sangvi", "Pimple Nilakh", "pimple nilakh", "Bhosari", "bhosari", "Talwade", "talwade", "Shivajinagar", "shivajinagar", "Laxmi Road", "laxmi road", "Kasba Peth", "kasba peth", "Rasta Peth", "rasta peth", "Mangalwar Peth", "mangalwar peth", "Sadashiv Peth", "sadashiv peth", "Shaniwar Peth", "shaniwar peth", "Narayan Peth", "narayan peth"]
 tenders = []
 given_date = datetime.strptime("01-Mar-2026", "%d-%b-%Y")
+
+def save_file():
+    filename = "tenders01.xlsx"
+    new_df = pd.DataFrame(tenders)
+    if os.path.exists(filename):
+        existing_df = pd.read_excel(filename)
+        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
+        updated_df.drop_duplicates(subset=["TENDER ID"], inplace=True)
+        updated_df.to_excel(filename, index=False)
+        print("Data appended successfully!")
+    else:
+        new_df.to_excel(filename, index=False)
+        print("File created and saved successfully!")
 
 async def fetch_data(page, n, context):
     if n == 1:
@@ -14,7 +27,11 @@ async def fetch_data(page, n, context):
     else:
         selector = f"//a[@id='DirectLink_{n}']"
     async with context.expect_page() as event_info:
-        await page.locator(selector).click()
+        try:
+            await page.locator(selector).click(timeout=60000)
+        except Exception as e:
+            print(f"Click failed on {selector}: {e}")
+            save_file()
     active_page = await event_info.value
     print(active_page.url)
     date = (await active_page.locator("//td[text()='Contract Date : ']/following-sibling::td/b").inner_text()).strip()
@@ -37,57 +54,67 @@ async def main():
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
         })
 
-        await page.goto("https://mahatenders.gov.in/nicgep/app", timeout=30000)
+        await page.goto("https://mahatenders.gov.in/nicgep/app", timeout=60000)
         await page.wait_for_load_state("networkidle")
 
         await page.locator("//a[text()='Results of Tenders']").click()
 
-        for keyword in keywords:
-            await page.locator("//input[@name='Keyword']").type(keyword)
-            command = await asyncio.to_thread(input, "Enter command: ")
+        try:
+            for keyword in keywords:
+                try:
+                    await page.locator("//input[@name='Keyword']").type(keyword)
+                    command = await asyncio.to_thread(input, "Enter command: ")
+                except Exception as e:
+                    print(f"Error typing keyword '{keyword}': {e}")
+                    save_file()
+                    continue
+                    #REtry
 
-            if command == "fetch":
-                num_of_tender = 1
-                while True:
-                    date, organisation, id, title, period, name, amount = await fetch_data(page, num_of_tender, context)
-                    tender_date = datetime.strptime(date, "%d-%b-%Y")
+                if command == "fetch":
+                    num_of_tender = 1
+                    while True:
+                        try:
+                            data = await fetch_data(page, num_of_tender, context)
+                            if not data or len(data) != 7:
+                                print(f"Invalid data at row {num_of_tender}")
+                                num_of_tender += 1
+                                continue
+                            date, organisation, id, title, period, name, amount = data
+                            tender_date = datetime.strptime(date, "%d-%b-%Y")
 
-                    if tender_date >= given_date:
-                        print(num_of_tender)
-                        num_of_tender += 1
-                        tenders.append({
-                            "TENDER ID": id,
-                            "TENDER TITLE": title,
-                            "CONTRACT DATE": date,
-                            "CONTRACT VALUE(INR)": amount,
-                            "WORK PERIOD(IN DAYS)": period,
-                            "ORGANISATION": organisation,
-                            "BIDDER NAME": name,
-                        })
+                            if tender_date >= given_date:
+                                print(num_of_tender)
+                                num_of_tender += 1
+                                tenders.append({
+                                    "TENDER ID": id,
+                                    "TENDER TITLE": title,
+                                    "CONTRACT DATE": date,
+                                    "CONTRACT VALUE(INR)": amount,
+                                    "WORK PERIOD(IN DAYS)": period,
+                                    "ORGANISATION": organisation,
+                                    "BIDDER NAME": name,
+                                })
+                                if num_of_tender == 101:
+                                    await page.locator("//a[@id='clear']").click()
+                                    break
 
-                    else:
-                        await page.locator("//a[@id='clear']").click()
-                        break
+                            else:
+                                await page.locator("//a[@id='clear']").click()
+                                break
+                        except Exception as e:
+                            print(f"Error at tender{num_of_tender}: {e}")
+                            num_of_tender += 1
 
-            elif command == "next":
-                await page.locator("//a[@id='clear']").click()
+                elif command == "next":
+                    await page.locator("//a[@id='clear']").click()
 
-            else: 
-                break
+                else: 
+                    break
+        except Exception as e:
+            print(f"Fatal Error: {e}")
 
         await context.close()
         await browser.close()
 
 asyncio.run(main())
-
-filename = "tenders01.xlsx"
-new_df = pd.DataFrame(tenders)
-if os.path.exists(filename):
-    existing_df = pd.read_excel(filename)
-    updated_df = pd.concat([existing_df, new_df], ignore_index=True)
-    updated_df.drop_duplicates(subset=["TENDER ID"], inplace=True)
-    updated_df.to_excel(filename, index=False)
-    print("Data appended successfully!")
-else:
-    new_df.to_excel(filename, index=False)
-    print("File created and saved successfully!")
+save_file()

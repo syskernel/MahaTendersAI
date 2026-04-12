@@ -1,6 +1,7 @@
 from google import genai
 from dotenv import load_dotenv
 import os
+import re
 
 load_dotenv()
 
@@ -26,6 +27,3 @@ def analyze_title(title):
             tiles = line.split(":",1)[1].strip()
 
     return job, tiles
-
-def contact_info(name):
-    pass
